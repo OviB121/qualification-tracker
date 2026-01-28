@@ -17,6 +17,13 @@
         <!-- Main View -->
         <div id="main-view" class="view active">
             <header class="header">
+                <button id="menu-btn" class="icon-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
                 <h1>Qualification Matrix</h1>
                 <button id="add-employee-btn" class="icon-btn">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -148,8 +155,36 @@
                 <button onclick="dismissInstallPrompt()">Got it</button>
             </div>
         </div>
+
+        <!-- Export Menu Modal -->
+        <div id="export-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Export Data</h2>
+                    <button class="close-btn" onclick="closeExportModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">Choose export format for your qualification matrix:</p>
+                    <button class="export-option-btn" onclick="exportToExcel()">
+                        <div class="export-icon">📊</div>
+                        <div class="export-info">
+                            <div class="export-title">Export to Excel</div>
+                            <div class="export-desc">Download as CSV file for Excel, Google Sheets, or Numbers</div>
+                        </div>
+                    </button>
+                    <button class="export-option-btn" onclick="exportToPDF()">
+                        <div class="export-icon">📄</div>
+                        <div class="export-info">
+                            <div class="export-title">Export to PDF</div>
+                            <div class="export-desc">Download formatted report for printing or sharing</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="app.js"></script>
     <script>
         // Register Service Worker
