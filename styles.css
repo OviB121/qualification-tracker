@@ -675,3 +675,131 @@ body {
     font-size: 14px;
     color: var(--text-secondary);
 }
+
+/* Scan Section Styles */
+.scan-section {
+    text-align: center;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 20px;
+}
+
+.scan-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--primary-color), #0051D5);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: transform 0.2s;
+}
+
+.scan-btn:active {
+    transform: scale(0.98);
+}
+
+.scan-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+.scan-hint {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.scan-loading {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.scan-loading p {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* Scanned Data Preview */
+.scanned-preview {
+    background-color: var(--background);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.preview-item {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.preview-item:last-child {
+    border-bottom: none;
+}
+
+.preview-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.preview-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: right;
+}
+
+.preview-value.editable {
+    color: var(--primary-color);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.confidence-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.confidence-high {
+    background-color: rgba(52, 199, 89, 0.2);
+    color: var(--success-color);
+}
+
+.confidence-medium {
+    background-color: rgba(255, 149, 0, 0.2);
+    color: var(--warning-color);
+}
+
+.confidence-low {
+    background-color: rgba(255, 59, 48, 0.2);
+    color: var(--danger-color);
+}
+
