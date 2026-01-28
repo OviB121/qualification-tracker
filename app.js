@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
     // Main view buttons
     document.getElementById('add-employee-btn').addEventListener('click', openAddEmployeeModal);
+    document.getElementById('menu-btn').addEventListener('click', openExportModal);
     
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -549,3 +550,264 @@ function dismissInstallPrompt() {
 window.addEventListener('load', () => {
     setTimeout(checkExpiringQualifications, 2000);
 });
+
+// Export Modal Functions
+function openExportModal() {
+    document.getElementById('export-modal').classList.add('active');
+}
+
+function closeExportModal() {
+    document.getElementById('export-modal').classList.remove('active');
+}
+
+// Export to Excel (CSV)
+function exportToExcel() {
+    closeExportModal();
+    
+    // Create CSV content
+    let csv = 'Employee Name,Department,Qualification,Valid From,Expiry Date,Days Until Expiry,Status\n';
+    
+    employees.forEach(emp => {
+        if (emp.qualifications.length === 0) {
+            csv += `"${emp.name}","${emp.department}","No qualifications","","","",""\n`;
+        } else {
+            emp.qualifications.forEach(qual => {
+                const status = getQualificationStatus(qual.expiryDate, qual.notificationDays);
+                const days = getDaysUntilExpiry(qual.expiryDate);
+                const statusText = getStatusText(status);
+                const daysText = days >= 0 ? days : `Expired ${Math.abs(days)} days ago`;
+                
+                csv += `"${emp.name}","${emp.department}","${qual.title}","${formatDate(qual.validFrom)}","${formatDate(qual.expiryDate)}","${daysText}","${statusText}"\n`;
+            });
+        }
+    });
+    
+    // Create blob and download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().split('T')[0];
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `qualification-matrix-${date}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Show success message
+    showToast('✅ Excel file downloaded!');
+}
+
+// Export to PDF
+function exportToPDF() {
+    closeExportModal();
+    
+    // Check if jsPDF is loaded
+    if (typeof window.jspdf === 'undefined') {
+        showToast('❌ PDF library not loaded. Please refresh the page.');
+        return;
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPos = margin;
+    
+    // Title
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.text('Qualification Matrix Report', margin, yPos);
+    yPos += 10;
+    
+    // Date
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(100);
+    const reportDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    doc.text(`Generated: ${reportDate}`, margin, yPos);
+    yPos += 15;
+    
+    // Summary Section
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0);
+    doc.text('Summary', margin, yPos);
+    yPos += 7;
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    
+    const totalEmployees = employees.length;
+    let totalQualifications = 0;
+    let expiredCount = 0;
+    let expiringCount = 0;
+    
+    employees.forEach(emp => {
+        totalQualifications += emp.qualifications.length;
+        emp.qualifications.forEach(qual => {
+            const status = getQualificationStatus(qual.expiryDate, qual.notificationDays);
+            if (status === 'expired') expiredCount++;
+            if (status === 'expiring') expiringCount++;
+        });
+    });
+    
+    doc.text(`Total Employees: ${totalEmployees}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Total Qualifications: ${totalQualifications}`, margin, yPos);
+    yPos += 5;
+    doc.setTextColor(255, 149, 0);
+    doc.text(`⚠ Expiring Soon: ${expiringCount}`, margin, yPos);
+    yPos += 5;
+    doc.setTextColor(255, 59, 48);
+    doc.text(`✕ Expired: ${expiredCount}`, margin, yPos);
+    yPos += 15;
+    
+    doc.setTextColor(0);
+    
+    // Employee Details
+    employees.forEach((emp, empIndex) => {
+        // Check if we need a new page
+        if (yPos > pageHeight - 40) {
+            doc.addPage();
+            yPos = margin;
+        }
+        
+        // Employee header with background
+        doc.setFillColor(240, 240, 247);
+        doc.rect(margin, yPos - 5, pageWidth - (2 * margin), 10, 'F');
+        
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(`${emp.name} - ${emp.department}`, margin + 2, yPos);
+        yPos += 10;
+        
+        if (emp.qualifications.length === 0) {
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'italic');
+            doc.setTextColor(150);
+            doc.text('No qualifications recorded', margin + 5, yPos);
+            doc.setTextColor(0);
+            yPos += 10;
+        } else {
+            emp.qualifications.forEach((qual, qualIndex) => {
+                // Check if we need a new page
+                if (yPos > pageHeight - 30) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+                
+                const status = getQualificationStatus(qual.expiryDate, qual.notificationDays);
+                const days = getDaysUntilExpiry(qual.expiryDate);
+                
+                // Qualification title
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.text(`• ${qual.title}`, margin + 5, yPos);
+                
+                // Status badge
+                const statusText = getStatusText(status);
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'bold');
+                
+                let badgeColor;
+                if (status === 'valid') badgeColor = [52, 199, 89];
+                else if (status === 'expiring') badgeColor = [255, 149, 0];
+                else badgeColor = [255, 59, 48];
+                
+                const statusWidth = doc.getTextWidth(statusText) + 4;
+                const statusX = pageWidth - margin - statusWidth;
+                
+                doc.setFillColor(...badgeColor);
+                doc.roundedRect(statusX, yPos - 3, statusWidth, 5, 1, 1, 'F');
+                doc.setTextColor(255);
+                doc.text(statusText, statusX + 2, yPos);
+                doc.setTextColor(0);
+                
+                yPos += 6;
+                
+                // Dates
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Valid From: ${formatDate(qual.validFrom)}`, margin + 10, yPos);
+                yPos += 4;
+                
+                if (status === 'expired') {
+                    doc.setTextColor(255, 59, 48);
+                }
+                doc.text(`Expires: ${formatDate(qual.expiryDate)}`, margin + 10, yPos);
+                doc.setTextColor(0);
+                yPos += 4;
+                
+                // Days remaining
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                const daysText = days >= 0 ? `${days} days remaining` : `Expired ${Math.abs(days)} days ago`;
+                doc.text(daysText, margin + 10, yPos);
+                doc.setTextColor(0);
+                yPos += 8;
+            });
+        }
+        
+        yPos += 5;
+    });
+    
+    // Footer on last page
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text('Generated by Qualification Tracker', margin, pageHeight - 10);
+    
+    // Save PDF
+    const date = new Date().toISOString().split('T')[0];
+    doc.save(`qualification-matrix-${date}.pdf`);
+    
+    // Show success message
+    showToast('✅ PDF downloaded!');
+}
+
+// Toast notification
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 10000;
+        animation: slideUp 0.3s ease-out;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease-out';
+        setTimeout(() => {
+            document.body.removeChild(toast);
+        }, 300);
+    }, 2500);
+}
+
+// Add animation styles
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
+
