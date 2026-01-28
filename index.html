@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Qualification Tracker">
+    <meta name="theme-color" content="#007AFF">
+    <title>Qualification Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Main View -->
+        <div id="main-view" class="view active">
+            <header class="header">
+                <h1>Qualification Matrix</h1>
+                <button id="add-employee-btn" class="icon-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </header>
+
+            <!-- Filter Buttons -->
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="expiring">Expiring Soon</button>
+                <button class="filter-btn" data-filter="expired">Expired</button>
+                <button class="filter-btn" data-filter="valid">Valid</button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search employees or departments..." class="search-input">
+            </div>
+
+            <!-- Employee List -->
+            <div id="employee-list" class="employee-list">
+                <!-- Employees will be dynamically inserted here -->
+            </div>
+        </div>
+
+        <!-- Employee Detail View -->
+        <div id="detail-view" class="view">
+            <header class="header">
+                <button id="back-btn" class="icon-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <h1>Employee Details</h1>
+                <button id="edit-employee-btn" class="icon-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
+            </header>
+
+            <div id="employee-detail" class="employee-detail">
+                <!-- Employee details will be dynamically inserted here -->
+            </div>
+        </div>
+
+        <!-- Add/Edit Employee Modal -->
+        <div id="employee-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="employee-modal-title">Add Employee</h2>
+                    <button class="close-btn" onclick="closeEmployeeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="employee-name" placeholder="Enter name">
+                    </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <input type="text" id="employee-department" placeholder="Enter department">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeEmployeeModal()">Cancel</button>
+                    <button class="btn btn-primary" id="save-employee-btn">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Qualification Modal -->
+        <div id="qualification-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add Qualification</h2>
+                    <button class="close-btn" onclick="closeQualificationModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="qualification-title" placeholder="e.g., First Aid Certificate">
+                    </div>
+                    <div class="form-group">
+                        <label>Valid From</label>
+                        <input type="date" id="qualification-valid-from">
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Date</label>
+                        <input type="date" id="qualification-expiry">
+                    </div>
+                    <div class="form-group">
+                        <label>Reminder Days Before Expiry</label>
+                        <input type="number" id="qualification-reminder" value="30" min="1" max="365">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeQualificationModal()">Cancel</button>
+                    <button class="btn btn-primary" id="save-qualification-btn">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div id="delete-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Confirm Delete</h2>
+                    <button class="close-btn" onclick="closeDeleteModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <p id="delete-message">Are you sure you want to delete this item?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                    <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Install Prompt (for iOS) -->
+        <div id="install-prompt" class="install-prompt" style="display: none;">
+            <div class="install-content">
+                <p><strong>Install this app</strong></p>
+                <p>Tap the share button <svg width="16" height="20" viewBox="0 0 16 20" fill="currentColor"><path d="M8 0L4 4h3v8h2V4h3L8 0zm-8 16h16v4H0v-4z"/></svg> and then "Add to Home Screen"</p>
+                <button onclick="dismissInstallPrompt()">Got it</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>

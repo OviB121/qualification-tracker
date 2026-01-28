@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+</head>
+<body>
+    <canvas id="canvas192" width="192" height="192"></canvas>
+    <canvas id="canvas512" width="512" height="512"></canvas>
+    <script>
+        function createIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#007AFF');
+            gradient.addColorStop(1, '#0051D5');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Icon - Document with checkmark
+            ctx.strokeStyle = 'white';
+            ctx.fillStyle = 'white';
+            ctx.lineWidth = size * 0.04;
+            
+            // Document outline
+            const docWidth = size * 0.5;
+            const docHeight = size * 0.6;
+            const docX = (size - docWidth) / 2;
+            const docY = (size - docHeight) / 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(docX, docY);
+            ctx.lineTo(docX + docWidth * 0.7, docY);
+            ctx.lineTo(docX + docWidth, docY + docHeight * 0.3);
+            ctx.lineTo(docX + docWidth, docY + docHeight);
+            ctx.lineTo(docX, docY + docHeight);
+            ctx.closePath();
+            ctx.stroke();
+            
+            // Checkmark
+            const checkSize = size * 0.15;
+            const checkX = docX + docWidth * 0.3;
+            const checkY = docY + docHeight * 0.5;
+            
+            ctx.lineWidth = size * 0.06;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(checkX, checkY);
+            ctx.lineTo(checkX + checkSize * 0.4, checkY + checkSize * 0.4);
+            ctx.lineTo(checkX + checkSize, checkY - checkSize * 0.3);
+            ctx.stroke();
+        }
+        
+        createIcon('canvas192', 192);
+        createIcon('canvas512', 512);
+        
+        // Save instructions
+        console.log('Right-click on each canvas and save as icon-192.png and icon-512.png');
+    </script>
+</body>
+</html>
