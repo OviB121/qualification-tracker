@@ -380,11 +380,14 @@ function deleteEmployee() {
 }
 
 // Qualification Modals
+let scannedQualificationData = null;
+
 function openAddQualificationModal() {
     const today = new Date().toISOString().split('T')[0];
     const oneYearLater = new Date();
     oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
     
+    document.getElementById('qualification-employee-name').value = currentEmployee ? currentEmployee.name : '';
     document.getElementById('qualification-title').value = '';
     document.getElementById('qualification-valid-from').value = today;
     document.getElementById('qualification-expiry').value = oneYearLater.toISOString().split('T')[0];
@@ -394,22 +397,47 @@ function openAddQualificationModal() {
 
 function closeQualificationModal() {
     document.getElementById('qualification-modal').classList.remove('active');
+    scannedQualificationData = null;
 }
 
 function saveQualification() {
+    const employeeName = document.getElementById('qualification-employee-name').value.trim();
     const title = document.getElementById('qualification-title').value.trim();
     const validFrom = document.getElementById('qualification-valid-from').value;
     const expiryDate = document.getElementById('qualification-expiry').value;
     const notificationDays = parseInt(document.getElementById('qualification-reminder').value);
     
     if (!title || !validFrom || !expiryDate) {
-        alert('Please fill in all fields');
+        alert('Please fill in qualification title and dates');
         return;
     }
     
     if (new Date(expiryDate) <= new Date(validFrom)) {
         alert('Expiry date must be after valid from date');
         return;
+    }
+    
+    // Check if employee name from scan matches current employee
+    if (employeeName && currentEmployee && employeeName.toLowerCase() !== currentEmployee.name.toLowerCase()) {
+        const confirmSwitch = confirm(`The scanned certificate is for "${employeeName}" but you're adding it to "${currentEmployee.name}". Do you want to:\n\nOK = Create/find employee "${employeeName}"\nCancel = Add to "${currentEmployee.name}" anyway`);
+        
+        if (confirmSwitch) {
+            // Find or create employee with scanned name
+            let targetEmployee = employees.find(e => e.name.toLowerCase() === employeeName.toLowerCase());
+            
+            if (!targetEmployee) {
+                // Create new employee
+                targetEmployee = {
+                    id: generateId(),
+                    name: employeeName,
+                    department: 'General', // Default department
+                    qualifications: []
+                };
+                employees.push(targetEmployee);
+            }
+            
+            currentEmployee = targetEmployee;
+        }
     }
     
     const newQualification = {
@@ -810,4 +838,309 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// Certificate Scanner Functions
+function openCameraScanner() {
+    document.getElementById('certificate-photo').click();
+}
+
+async function processCertificateImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Show loading
+    document.getElementById('scan-loading').style.display = 'block';
+    document.getElementById('manual-entry-fields').style.display = 'none';
+    
+    try {
+        // Perform OCR
+        const result = await Tesseract.recognize(file, 'eng', {
+            logger: m => {
+                if (m.status === 'recognizing text') {
+                    console.log(`Progress: ${Math.round(m.progress * 100)}%`);
+                }
+            }
+        });
+        
+        const extractedText = result.data.text;
+        console.log('Extracted text:', extractedText);
+        
+        // Parse the extracted text
+        const parsedData = parseConstructionCertificate(extractedText);
+        
+        // Hide loading
+        document.getElementById('scan-loading').style.display = 'none';
+        document.getElementById('manual-entry-fields').style.display = 'block';
+        
+        // Show confirmation modal
+        showScanConfirmation(parsedData);
+        
+    } catch (error) {
+        console.error('OCR Error:', error);
+        document.getElementById('scan-loading').style.display = 'none';
+        document.getElementById('manual-entry-fields').style.display = 'block';
+        showToast('❌ Failed to scan certificate. Please enter manually.');
+    }
+    
+    // Reset file input
+    event.target.value = '';
+}
+
+function parseConstructionCertificate(text) {
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    const data = {
+        employeeName: '',
+        qualificationTitle: '',
+        validFrom: '',
+        expiryDate: '',
+        confidence: {
+            name: 'low',
+            title: 'low',
+            validFrom: 'low',
+            expiry: 'low'
+        }
+    };
+    
+    // Common construction qualification keywords
+    const qualificationKeywords = [
+        'CSCS', 'CPCS', 'NPORS', 'IPAF', 'PASMA', 'SMSTS', 'SSSTS',
+        'First Aid', 'Asbestos', 'Manual Handling', 'Working at Height',
+        'Scaffolding', 'Confined Space', 'Abrasive Wheels', 'Forklift',
+        'Banksman', 'Slinger', 'Safety', 'Certificate', 'Card', 'Licence'
+    ];
+    
+    // Try to find qualification type
+    for (const line of lines) {
+        const upperLine = line.toUpperCase();
+        for (const keyword of qualificationKeywords) {
+            if (upperLine.includes(keyword.toUpperCase())) {
+                if (!data.qualificationTitle || line.length > data.qualificationTitle.length) {
+                    data.qualificationTitle = line;
+                    data.confidence.title = 'high';
+                }
+            }
+        }
+    }
+    
+    // Try to find name (usually after "Name:", "Holder:", or similar)
+    const namePatterns = [
+        /(?:Name|Holder|Cardholder|Employee)[\s:]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i,
+        /^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/
+    ];
+    
+    for (const line of lines) {
+        for (const pattern of namePatterns) {
+            const match = line.match(pattern);
+            if (match) {
+                const potentialName = match[1] || match[0];
+                // Verify it looks like a name (2-4 words, capitalized)
+                const words = potentialName.trim().split(/\s+/);
+                if (words.length >= 2 && words.length <= 4 && 
+                    words.every(w => /^[A-Z][a-z]+$/.test(w))) {
+                    data.employeeName = potentialName.trim();
+                    data.confidence.name = 'high';
+                    break;
+                }
+            }
+        }
+        if (data.employeeName) break;
+    }
+    
+    // Try to find dates
+    const datePatterns = [
+        /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/g,  // DD/MM/YYYY or DD-MM-YYYY
+        /(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/g,    // YYYY/MM/DD
+        /(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})/gi  // DD Month YYYY
+    ];
+    
+    const foundDates = [];
+    for (const line of lines) {
+        for (const pattern of datePatterns) {
+            const matches = line.matchAll(pattern);
+            for (const match of matches) {
+                const dateStr = match[0];
+                const parsedDate = parseFlexibleDate(dateStr);
+                if (parsedDate) {
+                    foundDates.push({
+                        original: dateStr,
+                        parsed: parsedDate,
+                        line: line
+                    });
+                }
+            }
+        }
+    }
+    
+    // Assign dates based on context
+    for (const dateInfo of foundDates) {
+        const lineLower = dateInfo.line.toLowerCase();
+        
+        if (lineLower.includes('expir') || lineLower.includes('valid to') || 
+            lineLower.includes('valid until')) {
+            data.expiryDate = dateInfo.parsed;
+            data.confidence.expiry = 'high';
+        } else if (lineLower.includes('issue') || lineLower.includes('valid from') || 
+                   lineLower.includes('date of issue')) {
+            data.validFrom = dateInfo.parsed;
+            data.confidence.validFrom = 'high';
+        }
+    }
+    
+    // If we have dates but no clear labels, assume first is issue, last is expiry
+    if (foundDates.length >= 2 && !data.expiryDate) {
+        data.validFrom = foundDates[0].parsed;
+        data.expiryDate = foundDates[foundDates.length - 1].parsed;
+        data.confidence.validFrom = 'medium';
+        data.confidence.expiry = 'medium';
+    } else if (foundDates.length === 1 && !data.expiryDate) {
+        data.expiryDate = foundDates[0].parsed;
+        data.confidence.expiry = 'medium';
+    }
+    
+    // Fallback: use current employee name if available
+    if (!data.employeeName && currentEmployee) {
+        data.employeeName = currentEmployee.name;
+        data.confidence.name = 'medium';
+    }
+    
+    return data;
+}
+
+function parseFlexibleDate(dateStr) {
+    // Try various date formats
+    const formats = [
+        // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+        {
+            regex: /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/,
+            parse: (m) => {
+                let day = parseInt(m[1]);
+                let month = parseInt(m[2]) - 1; // JS months are 0-indexed
+                let year = parseInt(m[3]);
+                if (year < 100) year += 2000;
+                return new Date(year, month, day);
+            }
+        },
+        // YYYY/MM/DD or YYYY-MM-DD
+        {
+            regex: /(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/,
+            parse: (m) => {
+                let year = parseInt(m[1]);
+                let month = parseInt(m[2]) - 1;
+                let day = parseInt(m[3]);
+                return new Date(year, month, day);
+            }
+        },
+        // DD Month YYYY
+        {
+            regex: /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{2,4})/i,
+            parse: (m) => {
+                const months = {
+                    'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+                    'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+                };
+                let day = parseInt(m[1]);
+                let month = months[m[2].toLowerCase().substring(0, 3)];
+                let year = parseInt(m[3]);
+                if (year < 100) year += 2000;
+                return new Date(year, month, day);
+            }
+        }
+    ];
+    
+    for (const format of formats) {
+        const match = dateStr.match(format.regex);
+        if (match) {
+            const date = format.parse(match);
+            if (date && !isNaN(date.getTime())) {
+                // Validate date is reasonable (between 1990 and 2050)
+                if (date.getFullYear() >= 1990 && date.getFullYear() <= 2050) {
+                    return date.toISOString().split('T')[0];
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+function showScanConfirmation(data) {
+    scannedQualificationData = data;
+    
+    const preview = document.getElementById('scanned-data-preview');
+    
+    const getConfidenceBadge = (level) => {
+        return `<span class="confidence-badge confidence-${level}">${level === 'high' ? '✓' : level === 'medium' ? '?' : '!'}</span>`;
+    };
+    
+    preview.innerHTML = `
+        <div class="preview-item">
+            <span class="preview-label">Employee Name</span>
+            <span class="preview-value">
+                ${data.employeeName || 'Not found'}
+                ${data.employeeName ? getConfidenceBadge(data.confidence.name) : ''}
+            </span>
+        </div>
+        <div class="preview-item">
+            <span class="preview-label">Qualification</span>
+            <span class="preview-value">
+                ${data.qualificationTitle || 'Not found'}
+                ${data.qualificationTitle ? getConfidenceBadge(data.confidence.title) : ''}
+            </span>
+        </div>
+        <div class="preview-item">
+            <span class="preview-label">Valid From</span>
+            <span class="preview-value">
+                ${data.validFrom ? formatDate(data.validFrom) : 'Not found'}
+                ${data.validFrom ? getConfidenceBadge(data.confidence.validFrom) : ''}
+            </span>
+        </div>
+        <div class="preview-item">
+            <span class="preview-label">Expiry Date</span>
+            <span class="preview-value">
+                ${data.expiryDate ? formatDate(data.expiryDate) : 'Not found'}
+                ${data.expiryDate ? getConfidenceBadge(data.confidence.expiry) : ''}
+            </span>
+        </div>
+    `;
+    
+    document.getElementById('scan-confirm-modal').classList.add('active');
+}
+
+function closeScanConfirmModal() {
+    document.getElementById('scan-confirm-modal').classList.remove('active');
+}
+
+function rejectScannedData() {
+    closeScanConfirmModal();
+    scannedQualificationData = null;
+    // Clear and reopen scanner
+    setTimeout(() => {
+        openCameraScanner();
+    }, 300);
+}
+
+function acceptScannedData() {
+    if (!scannedQualificationData) return;
+    
+    const data = scannedQualificationData;
+    
+    // Fill in the form fields
+    if (data.employeeName) {
+        document.getElementById('qualification-employee-name').value = data.employeeName;
+    }
+    if (data.qualificationTitle) {
+        document.getElementById('qualification-title').value = data.qualificationTitle;
+    }
+    if (data.validFrom) {
+        document.getElementById('qualification-valid-from').value = data.validFrom;
+    }
+    if (data.expiryDate) {
+        document.getElementById('qualification-expiry').value = data.expiryDate;
+    }
+    
+    closeScanConfirmModal();
+    showToast('✅ Data loaded! Please review and save.');
+}
+
 
